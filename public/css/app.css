@@ -1,0 +1,173 @@
+/* Arquivo CSS básico para desenvolvimento */
+
+/* Tailwind não está sendo compilado, então adicionamos alguns estilos básicos */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    color: #333;
+    background-color: #f8f9fa;
+    margin: 0;
+    padding: 0;
+}
+
+.container {
+    width: 100%;
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+.bg-white {
+    background-color: #fff;
+}
+
+.shadow {
+    box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px 0 rgba(0,0,0,0.06);
+}
+
+.rounded-lg {
+    border-radius: 0.5rem;
+}
+
+.p-6 {
+    padding: 1.5rem;
+}
+
+.mb-6 {
+    margin-bottom: 1.5rem;
+}
+
+.mb-4 {
+    margin-bottom: 1rem;
+}
+
+.gap-6 {
+    gap: 1.5rem;
+}
+
+.text-2xl {
+    font-size: 1.5rem;
+}
+
+.font-semibold {
+    font-weight: 600;
+}
+
+.text-gray-800 {
+    color: #2d3748;
+}
+
+.text-gray-600 {
+    color: #4a5568;
+}
+
+.flex {
+    display: flex;
+}
+
+.justify-between {
+    justify-content: space-between;
+}
+
+.items-center {
+    align-items: center;
+}
+
+.grid {
+    display: grid;
+}
+
+.grid-cols-1 {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+@media (min-width: 768px) {
+    .md\:grid-cols-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1024px) {
+    .lg\:grid-cols-4 {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .lg\:grid-cols-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .lg\:col-span-2 {
+        grid-column: span 2 / span 2;
+    }
+}
+
+.space-y-4 > * + * {
+    margin-top: 1rem;
+}
+
+.inline-flex {
+    display: inline-flex;
+}
+
+.px-4 {
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+.py-2 {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+}
+
+.bg-blue-600 {
+    background-color: #3182ce;
+}
+
+.bg-gray-200 {
+    background-color: #edf2f7;
+}
+
+.text-white {
+    color: white;
+}
+
+.uppercase {
+    text-transform: uppercase;
+}
+
+.text-xs {
+    font-size: 0.75rem;
+}
+
+.rounded-md {
+    border-radius: 0.375rem;
+}
+
+.border {
+    border-width: 1px;
+}
+
+.border-transparent {
+    border-color: transparent;
+}
+
+.hover\:bg-blue-700:hover {
+    background-color: #2b6cb0;
+}
+
+.hover\:bg-gray-300:hover {
+    background-color: #e2e8f0;
+}
+
+.focus\:outline-none:focus {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+}
+
+.transition {
+    transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+} 
