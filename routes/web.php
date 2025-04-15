@@ -10,10 +10,35 @@ use App\Http\Controllers\UserController;
 use App\Models\User;
 use App\Models\Ticket;
 use Carbon\Carbon;
+use Spatie\Permission\Models\Role;
 
 Route::get('/', function () {
     return view('welcome');
 });
+
+// Rota temporária para verificar papéis do usuário
+Route::get('/check-roles', function () {
+    $user = Auth::user();
+    if ($user) {
+        return [
+            'user' => $user->name,
+            'roles' => $user->getRoleNames(),
+            'permissions' => $user->getAllPermissions()->pluck('name'),
+        ];
+    }
+    return "Usuário não autenticado.";
+})->middleware('auth');
+
+// Rota temporária para atribuir papel de admin
+Route::get('/setup-admin', function () {
+    $user = Auth::user();
+    if ($user) {
+        $adminRole = Role::findByName('admin');
+        $user->assignRole($adminRole);
+        return "Papel de admin atribuído com sucesso!";
+    }
+    return "Usuário não autenticado.";
+})->middleware('auth');
 
 // Rotas de autenticação
 Route::middleware('guest')->group(function () {
@@ -36,8 +61,11 @@ Route::middleware('auth')->group(function () {
     
     // Rotas de chamados
     Route::resource('tickets', TicketController::class);
+    Route::post('tickets/{ticket}/accept', [TicketController::class, 'accept'])->name('tickets.accept');
     Route::post('tickets/{ticket}/comments', [TicketCommentController::class, 'store'])->name('tickets.comments.store');
     
     // Rotas de usuários (admin)
-    Route::resource('users', UserController::class);
+    Route::middleware('permission:manage users')->group(function () {
+        Route::resource('users', UserController::class);
+    });
 });

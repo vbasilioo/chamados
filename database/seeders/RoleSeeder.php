@@ -17,26 +17,24 @@ class RoleSeeder extends Seeder
         // Limpar o cache de permissões
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
-        // Criar funções
-        $admin = Role::create(['name' => 'admin']);
-        $operador = Role::create(['name' => 'operador']);
-        $usuario = Role::create(['name' => 'usuario']);
+        // Criar ou atualizar papéis
+        $adminRole = Role::firstOrCreate(['name' => 'admin']);
+        $operadorRole = Role::firstOrCreate(['name' => 'operador']);
+        $usuarioRole = Role::firstOrCreate(['name' => 'usuario']);
 
-        // Criar permissões para gerenciar usuários
-        $manageUsers = Permission::create(['name' => 'manage users']);
-        
-        // Criar permissões para tickets
-        $viewAllTickets = Permission::create(['name' => 'view all tickets']);
-        $manageAllTickets = Permission::create(['name' => 'manage all tickets']);
+        // Criar ou atualizar permissões
+        $manageUsers = Permission::firstOrCreate(['name' => 'manage users']);
+        $viewAllTickets = Permission::firstOrCreate(['name' => 'view all tickets']);
+        $manageAllTickets = Permission::firstOrCreate(['name' => 'manage all tickets']);
         
         // Atribuir permissões às funções
-        $admin->givePermissionTo([
+        $adminRole->syncPermissions([
             $manageUsers,
             $viewAllTickets,
             $manageAllTickets,
         ]);
         
-        $operador->givePermissionTo([
+        $operadorRole->syncPermissions([
             $viewAllTickets,
             $manageAllTickets,
         ]);

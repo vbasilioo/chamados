@@ -7,19 +7,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
+use Illuminate\Validation\Rules\Password;
 
 class UserController extends Controller
 {
     public function __construct()
     {
-        $this->middleware('auth');
-        // Apenas admin pode gerenciar usuários
-        $this->middleware(function ($request, $next) {
-            if (!Auth::user()->hasRole('admin')) {
-                abort(403, 'Acesso negado. Você não tem permissão para gerenciar usuários.');
-            }
-            return $next($request);
-        })->except(['show', 'edit', 'update']);
+        $this->middleware(['auth', 'role:admin']);
     }
     
     /**
@@ -27,12 +21,10 @@ class UserController extends Controller
      */
     public function index()
     {
-        // Apenas admin pode listar usuários
-        if (!Auth::user()->hasRole('admin')) {
-            abort(403, 'Acesso negado.');
-        }
-        
-        $users = User::all();
+        $users = User::withRole('user')
+            ->withCount('tickets', 'assignedTickets')
+            ->paginate(10);
+
         return view('users.index', compact('users'));
     }
 
@@ -41,8 +33,7 @@ class UserController extends Controller
      */
     public function create()
     {
-        $roles = Role::all();
-        return view('users.create', compact('roles'));
+        return view('users.create');
     }
 
     /**
@@ -50,23 +41,17 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:8|confirmed',
-            'roles' => 'required|array',
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
+            'password' => ['required', 'confirmed', Password::defaults()],
         ]);
 
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-        ]);
-        
-        $user->assignRole($request->roles);
+        $user = User::create($validated);
+        $user->assignRole('user');
 
         return redirect()->route('users.index')
-            ->with('success', 'Usuário criado com sucesso!');
+            ->with('success', 'Usuário criado com sucesso.');
     }
 
     /**
@@ -74,9 +59,8 @@ class UserController extends Controller
      */
     public function show(User $user)
     {
-        // Usuários só podem ver seus próprios perfis, a menos que sejam admin
-        if (Auth::id() !== $user->id && !Auth::user()->hasRole('admin')) {
-            abort(403, 'Você não tem permissão para visualizar este perfil.');
+        if (!Auth::user()->hasRole('admin') && Auth::id() !== $user->id) {
+            abort(403);
         }
         
         return view('users.show', compact('user'));
@@ -87,15 +71,7 @@ class UserController extends Controller
      */
     public function edit(User $user)
     {
-        // Usuários só podem editar seus próprios perfis, a menos que sejam admin
-        if (Auth::id() !== $user->id && !Auth::user()->hasRole('admin')) {
-            abort(403, 'Você não tem permissão para editar este perfil.');
-        }
-        
-        $roles = Role::all();
-        $userRoles = $user->roles->pluck('id')->toArray();
-        
-        return view('users.edit', compact('user', 'roles', 'userRoles'));
+        return view('users.edit', compact('user'));
     }
 
     /**
@@ -103,39 +79,20 @@ class UserController extends Controller
      */
     public function update(Request $request, User $user)
     {
-        // Usuários só podem atualizar seus próprios perfis, a menos que sejam admin
-        if (Auth::id() !== $user->id && !Auth::user()->hasRole('admin')) {
-            abort(403, 'Você não tem permissão para atualizar este perfil.');
-        }
-        
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,' . $user->id],
+            'password' => ['nullable', 'confirmed', Password::defaults()],
         ]);
-        
-        $data = [
-            'name' => $request->name,
-            'email' => $request->email,
-        ];
-        
-        // Se uma nova senha for fornecida, atualize-a
-        if ($request->filled('password')) {
-            $request->validate([
-                'password' => 'required|string|min:8|confirmed',
-            ]);
-            
-            $data['password'] = Hash::make($request->password);
-        }
-        
-        $user->update($data);
-        
-        // Apenas admin pode atualizar funções
-        if (Auth::user()->hasRole('admin') && $request->has('roles')) {
-            $user->syncRoles($request->roles);
+
+        if (empty($validated['password'])) {
+            unset($validated['password']);
         }
 
-        return redirect()->route(Auth::user()->hasRole('admin') ? 'users.index' : 'profile.show')
-            ->with('success', 'Usuário atualizado com sucesso!');
+        $user->update($validated);
+
+        return redirect()->route('users.index')
+            ->with('success', 'Usuário atualizado com sucesso.');
     }
 
     /**
@@ -143,15 +100,14 @@ class UserController extends Controller
      */
     public function destroy(User $user)
     {
-        // Não permitir que um admin exclua a si mesmo
-        if (Auth::id() === $user->id) {
+        if ($user->tickets()->exists() || $user->assignedTickets()->exists()) {
             return redirect()->route('users.index')
-                ->with('error', 'Você não pode excluir seu próprio usuário.');
+                ->with('error', 'Não é possível excluir um usuário que possui chamados.');
         }
-        
+
         $user->delete();
-        
+
         return redirect()->route('users.index')
-            ->with('success', 'Usuário excluído com sucesso!');
+            ->with('success', 'Usuário excluído com sucesso.');
     }
 }

@@ -124,7 +124,7 @@ class DashboardController extends Controller
             ->map(function ($ticket) {
                 return [
                     'user' => $ticket->user->name,
-                    'action' => "Atualizou o status do chamado #{$ticket->id} para \"{$ticket->status}\"",
+                    'action' => "Atualizou o status do chamado #{$ticket->id} para \"{$ticket->status->label()}\"",
                     'time' => $ticket->updated_at,
                 ];
             });

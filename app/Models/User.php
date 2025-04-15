@@ -7,11 +7,14 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Hash;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasRoles;
+    use HasFactory, Notifiable, HasRoles, SoftDeletes;
 
     /**
      * The attributes that are mass assignable.
@@ -47,7 +50,7 @@ class User extends Authenticatable
     /**
      * Get the tickets created by the user.
      */
-    public function tickets()
+    public function tickets(): HasMany
     {
         return $this->hasMany(Ticket::class);
     }
@@ -55,8 +58,34 @@ class User extends Authenticatable
     /**
      * Get the tickets assigned to the user.
      */
-    public function assignedTickets()
+    public function assignedTickets(): HasMany
     {
         return $this->hasMany(Ticket::class, 'assigned_to');
+    }
+
+    /**
+     * Get the user's active tickets count.
+     */
+    public function getActiveTicketsCountAttribute(): int
+    {
+        return $this->assignedTickets()
+            ->whereIn('status', ['open', 'in_progress'])
+            ->count();
+    }
+
+    /**
+     * Set the user's password.
+     */
+    public function setPasswordAttribute($value): void
+    {
+        $this->attributes['password'] = Hash::make($value);
+    }
+
+    /**
+     * Scope a query to only include users with specific role.
+     */
+    public function scopeWithRole($query, string $role)
+    {
+        return $query->role($role);
     }
 }

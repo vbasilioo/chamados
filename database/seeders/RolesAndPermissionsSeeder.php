@@ -7,6 +7,7 @@ use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 
 class RolesAndPermissionsSeeder extends Seeder
 {
@@ -18,82 +19,66 @@ class RolesAndPermissionsSeeder extends Seeder
         // Reset cached roles and permissions
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
-        // Create permissions
-        // Dashboard permissions
-        Permission::create(['name' => 'view dashboard']);
-        Permission::create(['name' => 'view stats']);
-        Permission::create(['name' => 'view charts']);
-        Permission::create(['name' => 'view activities']);
-        
-        // User management permissions
-        Permission::create(['name' => 'create users']);
-        Permission::create(['name' => 'edit users']);
-        Permission::create(['name' => 'delete users']);
-        Permission::create(['name' => 'view users']);
-        
-        // Role management permissions
-        Permission::create(['name' => 'assign roles']);
-        Permission::create(['name' => 'view roles']);
-        Permission::create(['name' => 'create roles']);
-        Permission::create(['name' => 'edit roles']);
-        Permission::create(['name' => 'delete roles']);
-        
-        // Profile permissions
-        Permission::create(['name' => 'edit profile']);
-        Permission::create(['name' => 'view profile']);
+        // Create roles
+        $adminRole = Role::create(['name' => 'admin']);
+        $userRole = Role::create(['name' => 'user']);
 
-        // Create roles and assign permissions
-        $administratorRole = Role::create(['name' => 'administrator']);
-        $administratorRole->givePermissionTo(Permission::all());
-        
-        $operatorRole = Role::create(['name' => 'operator']);
-        $operatorRole->givePermissionTo([
+        // Create permissions
+        $permissions = [
+            // Dashboard permissions
             'view dashboard',
             'view stats',
             'view charts',
             'view activities',
+            
+            // User management permissions
+            'create users',
+            'edit users',
+            'delete users',
             'view users',
+            
+            // Ticket management permissions
+            'create tickets',
+            'edit tickets',
+            'delete tickets',
+            'view tickets',
+            'assign tickets',
+            'change ticket status',
+            
+            // Profile permissions
+            'edit profile',
+            'view profile'
+        ];
+
+        foreach ($permissions as $permission) {
+            Permission::create(['name' => $permission]);
+        }
+
+        // Assign permissions to roles
+        $adminRole->givePermissionTo(Permission::all());
+        $userRole->givePermissionTo([
+            'create tickets',
+            'view tickets',
             'edit profile',
             'view profile'
         ]);
-        
-        $clientRole = Role::create(['name' => 'client']);
-        $clientRole->givePermissionTo([
-            'edit profile',
-            'view profile'
+
+        // Create admin user
+        $admin = User::create([
+            'name' => 'Administrador',
+            'email' => 'admin@example.com',
+            'password' => 'password', // Será hasheado pelo mutator
         ]);
 
-        // Create admin user if it doesn't exist
-        $admin = User::firstOrCreate(
-            ['email' => 'admin@example.com'],
-            [
-                'name' => 'Admin User',
-                'password' => bcrypt('password'),
-                'email_verified_at' => now(),
-            ]
-        );
-        $admin->assignRole('administrator');
+        $admin->assignRole('admin');
 
-        // Create operator user
-        $operator = User::firstOrCreate(
-            ['email' => 'operator@example.com'],
-            [
-                'name' => 'Operator User',
-                'password' => bcrypt('password'),
-                'email_verified_at' => now(),
-            ]
-        );
-        $operator->assignRole('operator');
+        // Create regular user
+        $user = User::create([
+            'name' => 'Usuário',
+            'email' => 'user@example.com',
+            'password' => 'password', // Será hasheado pelo mutator
+        ]);
 
-        // Create client user
-        $client = User::firstOrCreate(
-            ['email' => 'client@example.com'],
-            [
-                'name' => 'Client User',
-                'password' => bcrypt('password'),
-                'email_verified_at' => now(),
-            ]
-        );
-        $client->assignRole('client');
+        $user->assignRole('user');
     }
 }

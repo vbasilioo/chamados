@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Ticket;
-use App\Models\User;
 use App\Models\Category;
+use App\Models\User;
+use App\Enums\TicketStatus;
+use App\Enums\TicketPriority;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -18,22 +20,25 @@ class TicketController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        // Verifica se é admin ou operador para mostrar todos os tickets
-        if (Auth::user()->hasRole('admin') || Auth::user()->hasRole('operador')) {
-            $tickets = Ticket::with(['user', 'assignedUser', 'category'])->latest()->paginate(10);
-        } else {
-            // Usuário normal só vê seus próprios tickets
-            $tickets = Ticket::with(['user', 'assignedUser', 'category'])
-                ->where('user_id', Auth::id())
-                ->latest()
-                ->paginate(10);
-        }
-        
+        $query = Ticket::with(['user', 'assignedUser', 'category'])
+            ->when($request->status, fn($q) => $q->withStatus(TicketStatus::from($request->status)))
+            ->when($request->priority, fn($q) => $q->withPriority(TicketPriority::from($request->priority)))
+            ->when($request->category_id, fn($q) => $q->where('category_id', $request->category_id))
+            ->when(!Auth::user()->hasRole('admin'), function($q) {
+                $q->where(function($query) {
+                    $query->where('user_id', Auth::id())
+                        ->orWhere('assigned_to', Auth::id());
+                });
+            });
+
+        $tickets = $query->latest()->paginate(10);
         $categories = Category::all();
-        
-        return view('tickets.index', compact('tickets', 'categories'));
+        $statuses = TicketStatus::cases();
+        $priorities = TicketPriority::cases();
+
+        return view('tickets.index', compact('tickets', 'categories', 'statuses', 'priorities'));
     }
 
     /**
@@ -41,10 +46,11 @@ class TicketController extends Controller
      */
     public function create()
     {
-        $users = User::all();
         $categories = Category::all();
-        
-        return view('tickets.create', compact('users', 'categories'));
+        $priorities = TicketPriority::cases();
+        $agents = User::role('admin')->get();
+
+        return view('tickets.create', compact('categories', 'priorities', 'agents'));
     }
 
     /**
@@ -52,26 +58,21 @@ class TicketController extends Controller
      */
     public function store(Request $request)
     {
-        $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
-            'assignee_id' => 'nullable|exists:users,id',
-            'priority' => 'required|in:baixa,media,alta,critica',
-            'category_id' => 'required|exists:categories,id',
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['required', 'string'],
+            'category_id' => ['required', 'exists:categories,id'],
+            'priority' => ['required', 'string', 'in:' . implode(',', array_column(TicketPriority::cases(), 'value'))],
+            'assigned_to' => ['nullable', 'exists:users,id'],
         ]);
 
-        $ticket = new Ticket();
-        $ticket->title = $request->title;
-        $ticket->description = $request->description;
-        $ticket->user_id = Auth::id();
-        $ticket->assigned_to = $request->assignee_id;
-        $ticket->priority = $request->priority;
-        $ticket->category_id = $request->category_id;
-        $ticket->status = 'aberto';
-        $ticket->save();
+        $validated['user_id'] = Auth::id();
+        $validated['status'] = TicketStatus::OPEN;
+
+        $ticket = Ticket::create($validated);
 
         return redirect()->route('tickets.show', $ticket)
-            ->with('success', 'Chamado criado com sucesso!');
+            ->with('success', 'Chamado criado com sucesso.');
     }
 
     /**
@@ -79,12 +80,10 @@ class TicketController extends Controller
      */
     public function show(Ticket $ticket)
     {
-        // Verifica se o usuário tem permissão para ver este ticket
-        if (!Auth::user()->hasRole(['admin', 'operador']) && Auth::id() !== $ticket->user_id) {
-            abort(403, 'Você não tem permissão para visualizar este chamado.');
-        }
-        
-        $ticket->load(['user', 'assignedUser', 'comments.user', 'category']);
+        $this->authorize('view', $ticket);
+
+        $ticket->load(['user', 'assignedUser', 'category', 'comments.user']);
+
         return view('tickets.show', compact('ticket'));
     }
 
@@ -93,15 +92,14 @@ class TicketController extends Controller
      */
     public function edit(Ticket $ticket)
     {
-        // Verifica se o usuário tem permissão para editar este ticket
-        if (!Auth::user()->hasRole(['admin', 'operador']) && Auth::id() !== $ticket->user_id) {
-            abort(403, 'Você não tem permissão para editar este chamado.');
-        }
-        
-        $users = User::all();
+        $this->authorize('update', $ticket);
+
         $categories = Category::all();
-        
-        return view('tickets.edit', compact('ticket', 'users', 'categories'));
+        $priorities = TicketPriority::cases();
+        $statuses = TicketStatus::cases();
+        $agents = User::role('admin')->get();
+
+        return view('tickets.edit', compact('ticket', 'categories', 'priorities', 'statuses', 'agents'));
     }
 
     /**
@@ -109,30 +107,21 @@ class TicketController extends Controller
      */
     public function update(Request $request, Ticket $ticket)
     {
-        // Verifica se o usuário tem permissão para atualizar este ticket
-        if (!Auth::user()->hasRole(['admin', 'operador']) && Auth::id() !== $ticket->user_id) {
-            abort(403, 'Você não tem permissão para atualizar este chamado.');
-        }
-        
-        $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
-            'assignee_id' => 'nullable|exists:users,id',
-            'status' => 'required|in:aberto,em_andamento,resolvido,fechado',
-            'priority' => 'required|in:baixa,media,alta,critica',
-            'category_id' => 'required|exists:categories,id',
+        $this->authorize('update', $ticket);
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['required', 'string'],
+            'category_id' => ['required', 'exists:categories,id'],
+            'priority' => ['required', 'string', 'in:' . implode(',', array_column(TicketPriority::cases(), 'value'))],
+            'status' => ['required', 'string', 'in:' . implode(',', array_column(TicketStatus::cases(), 'value'))],
+            'assigned_to' => ['nullable', 'exists:users,id'],
         ]);
 
-        $ticket->title = $request->title;
-        $ticket->description = $request->description;
-        $ticket->assigned_to = $request->assignee_id;
-        $ticket->status = $request->status;
-        $ticket->priority = $request->priority;
-        $ticket->category_id = $request->category_id;
-        $ticket->save();
+        $ticket->update($validated);
 
         return redirect()->route('tickets.show', $ticket)
-            ->with('success', 'Chamado atualizado com sucesso!');
+            ->with('success', 'Chamado atualizado com sucesso.');
     }
 
     /**
@@ -140,14 +129,26 @@ class TicketController extends Controller
      */
     public function destroy(Ticket $ticket)
     {
-        // Apenas admin pode excluir tickets
-        if (!Auth::user()->hasRole('admin')) {
-            abort(403, 'Você não tem permissão para excluir chamados.');
-        }
-        
+        $this->authorize('delete', $ticket);
+
         $ticket->delete();
-        
+
         return redirect()->route('tickets.index')
-            ->with('success', 'Chamado excluído com sucesso!');
+            ->with('success', 'Chamado excluído com sucesso.');
+    }
+
+    public function accept(Ticket $ticket)
+    {
+        if (!Auth::user()->hasRole('operador')) {
+            abort(403);
+        }
+
+        $ticket->update([
+            'assigned_to' => Auth::id(),
+            'status' => 'em_andamento'
+        ]);
+
+        return redirect()->route('tickets.show', $ticket)
+            ->with('success', 'Chamado aceito com sucesso!');
     }
 }
