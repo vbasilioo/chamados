@@ -14,19 +14,33 @@ class PermissionMiddleware
      * @param  \Illuminate\Http\Request  $request
      * @param  \Closure  $next
      * @param  string  $permission
+     * @param  string  $guard
      * @return mixed
      */
-    public function handle($request, Closure $next, $permission = null)
+    public function handle(Request $request, Closure $next, $permission = null, $guard = null)
     {
-        if (empty($permission)) {
-            return $next($request);
+        $authGuard = app('auth')->guard($guard);
+
+        if ($authGuard->guest()) {
+            throw UnauthorizedException::notLoggedIn();
         }
 
-        // Check if the user has the permission
-        if (auth()->user()->can($permission)) {
-            return $next($request);
+        // For users with multiple permissions
+        if (strpos($permission, '|') !== false) {
+            $permissions = explode('|', $permission);
+            foreach ($permissions as $permission) {
+                if ($authGuard->user()->hasPermissionTo(trim($permission))) {
+                    return $next($request);
+                }
+            }
+            throw UnauthorizedException::forPermissions($permissions);
         }
 
-        throw UnauthorizedException::forPermissions([$permission]);
+        // For a single permission
+        if (! empty($permission) && ! $authGuard->user()->hasPermissionTo($permission)) {
+            throw UnauthorizedException::forPermissions([$permission]);
+        }
+
+        return $next($request);
     }
 } 

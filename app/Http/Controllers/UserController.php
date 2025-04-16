@@ -13,7 +13,16 @@ class UserController extends Controller
 {
     public function __construct()
     {
-        $this->middleware(['auth', 'role:admin']);
+        $this->middleware('auth');
+        
+        // Check if the user is an admin in every method
+        $this->middleware(function ($request, $next) {
+            if (!auth()->user() || !auth()->user()->hasRole('admin')) {
+                abort(403, 'Acesso negado. Apenas administradores podem acessar esta página.');
+            }
+            
+            return $next($request);
+        });
     }
     
     /**
@@ -21,7 +30,7 @@ class UserController extends Controller
      */
     public function index()
     {
-        $users = User::withRole('user')
+        $users = User::with('roles')
             ->withCount('tickets', 'assignedTickets')
             ->paginate(10);
 
@@ -33,7 +42,8 @@ class UserController extends Controller
      */
     public function create()
     {
-        return view('users.create');
+        $roles = Role::all();
+        return view('users.create', compact('roles'));
     }
 
     /**
@@ -45,10 +55,22 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => ['required', 'confirmed', Password::defaults()],
+            'roles' => ['nullable', 'array'],
         ]);
 
-        $user = User::create($validated);
-        $user->assignRole('user');
+        $user = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => $validated['password'],
+        ]);
+
+        // If no roles are selected, assign the default 'user' role
+        if (!empty($validated['roles'])) {
+            $roles = Role::whereIn('id', $validated['roles'])->get();
+            $user->syncRoles($roles);
+        } else {
+            $user->assignRole('user');
+        }
 
         return redirect()->route('users.index')
             ->with('success', 'Usuário criado com sucesso.');
@@ -59,11 +81,13 @@ class UserController extends Controller
      */
     public function show(User $user)
     {
-        if (!Auth::user()->hasRole('admin') && Auth::id() !== $user->id) {
-            abort(403);
-        }
+        $this->authorize('view', $user);
         
-        return view('users.show', compact('user'));
+        $user->load('roles');
+        $ticketsCount = $user->tickets()->count();
+        $assignedTicketsCount = $user->assignedTickets()->count();
+        
+        return view('users.show', compact('user', 'ticketsCount', 'assignedTicketsCount'));
     }
 
     /**
@@ -71,7 +95,12 @@ class UserController extends Controller
      */
     public function edit(User $user)
     {
-        return view('users.edit', compact('user'));
+        $this->authorize('update', $user);
+        
+        $roles = Role::all();
+        $userRoles = $user->roles->pluck('id')->toArray();
+        
+        return view('users.edit', compact('user', 'roles', 'userRoles'));
     }
 
     /**
@@ -79,17 +108,31 @@ class UserController extends Controller
      */
     public function update(Request $request, User $user)
     {
+        $this->authorize('update', $user);
+        
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,' . $user->id],
             'password' => ['nullable', 'confirmed', Password::defaults()],
+            'roles' => ['nullable', 'array'],
         ]);
 
-        if (empty($validated['password'])) {
-            unset($validated['password']);
+        $userData = [
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+        ];
+
+        if (!empty($validated['password'])) {
+            $userData['password'] = $validated['password'];
         }
 
-        $user->update($validated);
+        $user->update($userData);
+
+        // Update roles if they were provided
+        if (isset($validated['roles'])) {
+            $roles = Role::whereIn('id', $validated['roles'])->get();
+            $user->syncRoles($roles);
+        }
 
         return redirect()->route('users.index')
             ->with('success', 'Usuário atualizado com sucesso.');
@@ -100,6 +143,8 @@ class UserController extends Controller
      */
     public function destroy(User $user)
     {
+        $this->authorize('delete', $user);
+        
         if ($user->tickets()->exists() || $user->assignedTickets()->exists()) {
             return redirect()->route('users.index')
                 ->with('error', 'Não é possível excluir um usuário que possui chamados.');

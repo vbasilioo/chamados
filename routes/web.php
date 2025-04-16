@@ -16,6 +16,9 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+// Redirect /home to /dashboard
+Route::redirect('/home', '/dashboard');
+
 // Rota temporária para verificar papéis do usuário
 Route::get('/check-roles', function () {
     $user = Auth::user();
@@ -65,7 +68,5 @@ Route::middleware('auth')->group(function () {
     Route::post('tickets/{ticket}/comments', [TicketCommentController::class, 'store'])->name('tickets.comments.store');
     
     // Rotas de usuários (admin)
-    Route::middleware('permission:manage users')->group(function () {
-        Route::resource('users', UserController::class);
-    });
+    Route::resource('users', UserController::class);
 });

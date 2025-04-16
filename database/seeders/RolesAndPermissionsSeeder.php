@@ -36,6 +36,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'edit users',
             'delete users',
             'view users',
+            'manage users',
             
             // Ticket management permissions
             'create tickets',
