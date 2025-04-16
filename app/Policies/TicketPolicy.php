@@ -15,6 +15,7 @@ class TicketPolicy
     public function view(User $user, Ticket $ticket): bool
     {
         return $user->hasRole('admin') || 
+               $user->hasRole('operador') ||
                $ticket->user_id === $user->id || 
                $ticket->assigned_to === $user->id;
     }
@@ -27,6 +28,7 @@ class TicketPolicy
     public function update(User $user, Ticket $ticket): bool
     {
         return $user->hasRole('admin') || 
+               $user->hasRole('operador') ||
                $ticket->assigned_to === $user->id;
     }
 
@@ -37,12 +39,13 @@ class TicketPolicy
 
     public function assign(User $user, Ticket $ticket): bool
     {
-        return $user->hasRole('admin');
+        return $user->hasRole('admin') || $user->hasRole('operador');
     }
 
     public function changeStatus(User $user, Ticket $ticket): bool
     {
         return $user->hasRole('admin') || 
+               $user->hasRole('operador') ||
                $ticket->assigned_to === $user->id;
     }
 } 

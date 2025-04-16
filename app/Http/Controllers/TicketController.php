@@ -48,7 +48,7 @@ class TicketController extends Controller
     {
         $categories = Category::all();
         $priorities = TicketPriority::cases();
-        $agents = User::role('admin')->get();
+        $agents = User::role(['admin', 'operador'])->get();
 
         return view('tickets.create', compact('categories', 'priorities', 'agents'));
     }
@@ -97,7 +97,7 @@ class TicketController extends Controller
         $categories = Category::all();
         $priorities = TicketPriority::cases();
         $statuses = TicketStatus::cases();
-        $agents = User::role('admin')->get();
+        $agents = User::role(['admin', 'operador'])->get();
 
         return view('tickets.edit', compact('ticket', 'categories', 'priorities', 'statuses', 'agents'));
     }
@@ -139,13 +139,20 @@ class TicketController extends Controller
 
     public function accept(Ticket $ticket)
     {
-        if (!Auth::user()->hasRole('operador')) {
-            abort(403);
+        // Apenas operadores e admins podem aceitar chamados
+        if (!Auth::user()->hasAnyRole(['operador', 'admin'])) {
+            abort(403, 'Somente operadores e administradores podem aceitar chamados.');
+        }
+
+        // Verifica se o chamado já está atribuído
+        if ($ticket->assigned_to !== null) {
+            return redirect()->route('tickets.show', $ticket)
+                ->with('error', 'Este chamado já está atribuído a um operador.');
         }
 
         $ticket->update([
             'assigned_to' => Auth::id(),
-            'status' => 'em_andamento'
+            'status' => TicketStatus::IN_PROGRESS
         ]);
 
         return redirect()->route('tickets.show', $ticket)

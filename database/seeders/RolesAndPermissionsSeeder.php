@@ -21,6 +21,7 @@ class RolesAndPermissionsSeeder extends Seeder
 
         // Create roles
         $adminRole = Role::create(['name' => 'admin']);
+        $operadorRole = Role::create(['name' => 'operador']);
         $userRole = Role::create(['name' => 'user']);
 
         // Create permissions
@@ -45,6 +46,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'view tickets',
             'assign tickets',
             'change ticket status',
+            'accept tickets',
             
             // Profile permissions
             'edit profile',
@@ -57,6 +59,20 @@ class RolesAndPermissionsSeeder extends Seeder
 
         // Assign permissions to roles
         $adminRole->givePermissionTo(Permission::all());
+        
+        $operadorRole->givePermissionTo([
+            'view dashboard',
+            'view stats',
+            'view charts',
+            'view activities',
+            'view tickets',
+            'edit tickets',
+            'change ticket status',
+            'accept tickets',
+            'edit profile',
+            'view profile'
+        ]);
+        
         $userRole->givePermissionTo([
             'create tickets',
             'view tickets',
@@ -72,6 +88,15 @@ class RolesAndPermissionsSeeder extends Seeder
         ]);
 
         $admin->assignRole('admin');
+        
+        // Create operator user
+        $operator = User::create([
+            'name' => 'Operador',
+            'email' => 'operator@example.com',
+            'password' => 'password', // Será hasheado pelo mutator
+        ]);
+
+        $operator->assignRole('operador');
 
         // Create regular user
         $user = User::create([

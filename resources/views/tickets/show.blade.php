@@ -8,6 +8,14 @@
                 <div class="flex justify-between items-center mb-6">
                     <h2 class="text-2xl font-bold">Chamado #{{ $ticket->id }}</h2>
                     <div class="space-x-2">
+                        @if($ticket->assigned_to === null && Auth::user()->hasAnyRole(['operador', 'admin']))
+                        <form action="{{ route('tickets.accept', $ticket) }}" method="POST" class="inline">
+                            @csrf
+                            <button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+                                Aceitar Chamado
+                            </button>
+                        </form>
+                        @endif
                         @can('update', $ticket)
                         <a href="{{ route('tickets.edit', $ticket) }}" class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded">
                             Editar
