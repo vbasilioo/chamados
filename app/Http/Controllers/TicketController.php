@@ -158,4 +158,25 @@ class TicketController extends Controller
         return redirect()->route('tickets.show', $ticket)
             ->with('success', 'Chamado aceito com sucesso!');
     }
+
+    public function close(Ticket $ticket)
+    {
+        // Verifica se o usuário pode fechar o chamado (admin, operador ou atribuído ao ticket)
+        if (!Auth::user()->hasAnyRole(['operador', 'admin']) && $ticket->assigned_to !== Auth::id()) {
+            abort(403, 'Você não tem permissão para finalizar este chamado.');
+        }
+
+        // Verifica se o chamado já está fechado ou resolvido
+        if ($ticket->status === TicketStatus::CLOSED || $ticket->status === TicketStatus::RESOLVED) {
+            return redirect()->route('tickets.show', $ticket)
+                ->with('error', 'Este chamado já está finalizado.');
+        }
+
+        $ticket->update([
+            'status' => TicketStatus::RESOLVED
+        ]);
+
+        return redirect()->route('tickets.show', $ticket)
+            ->with('success', 'Chamado finalizado com sucesso!');
+    }
 }

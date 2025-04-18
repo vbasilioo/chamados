@@ -23,6 +23,13 @@ class RedirectIfAuthenticated
 
         foreach ($guards as $guard) {
             if (Auth::guard($guard)->check()) {
+                $user = Auth::guard($guard)->user();
+                
+                // Redireciona para tickets se for admin ou operador
+                if ($user->hasAnyRole(['admin', 'operador'])) {
+                    return redirect()->route('tickets.index');
+                }
+                
                 return redirect(RouteServiceProvider::HOME);
             }
         }

@@ -65,6 +65,7 @@ Route::middleware('auth')->group(function () {
     // Rotas de chamados
     Route::resource('tickets', TicketController::class);
     Route::post('tickets/{ticket}/accept', [TicketController::class, 'accept'])->name('tickets.accept');
+    Route::post('tickets/{ticket}/close', [TicketController::class, 'close'])->name('tickets.close');
     Route::post('tickets/{ticket}/comments', [TicketCommentController::class, 'store'])->name('tickets.comments.store');
     
     // Rotas de usuários (admin)

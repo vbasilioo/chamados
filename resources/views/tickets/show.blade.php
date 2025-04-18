@@ -16,6 +16,15 @@
                             </button>
                         </form>
                         @endif
+                        @if($ticket->status->value !== 'closed' && $ticket->status->value !== 'resolved' && 
+                            (Auth::user()->hasAnyRole(['operador', 'admin']) || $ticket->assigned_to === Auth::id()))
+                        <form action="{{ route('tickets.close', $ticket) }}" method="POST" class="inline">
+                            @csrf
+                            <button type="submit" class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">
+                                Finalizar Chamado
+                            </button>
+                        </form>
+                        @endif
                         @can('update', $ticket)
                         <a href="{{ route('tickets.edit', $ticket) }}" class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded">
                             Editar
